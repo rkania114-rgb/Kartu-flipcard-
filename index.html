@@ -1,0 +1,1453 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Paint & Hide: GenRe Chameleon 3D</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #1a0f0d;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #fff;
+        }
+
+        /* Mode Paksa Landscape di Layar HP */
+        @media screen and (min-aspect-ratio: 1/1) {
+            #game-container {
+                width: 100vw;
+                height: 100vh;
+            }
+        }
+
+        @media screen and (max-aspect-ratio: 1/1) {
+            #game-container {
+                width: 100vh;
+                height: 100vw;
+                transform: rotate(90deg);
+                transform-origin: bottom left;
+                position: absolute;
+                top: -100vw;
+                left: 0;
+            }
+        }
+
+        #game-container {
+            position: relative;
+            background: #000;
+        }
+
+        #canvas3d {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* UI Overlays */
+        .ui-panel {
+            position: absolute;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .interactive {
+            pointer-events: auto;
+        }
+
+        /* HUD Atas */
+        #top-hud {
+            top: 12px;
+            left: 15px;
+            right: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .hud-card {
+            background: rgba(30, 18, 12, 0.85);
+            border: 2px solid #d4a359;
+            border-radius: 12px;
+            padding: 6px 14px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            backdrop-filter: blur(5px);
+            font-weight: bold;
+            font-size: 13px;
+        }
+
+        .hud-btn {
+            background: linear-gradient(135deg, #e67e22, #d35400);
+            border: 2px solid #fff;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 12px;
+            cursor: pointer;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+        }
+
+        .hud-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* Tombol Utama Paint */
+        #paint-btn-container {
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+        }
+
+        #paint-btn {
+            background: linear-gradient(135deg, #2ecc71, #27ae60);
+            border: 3px solid #ffffff;
+            color: white;
+            font-size: 18px;
+            font-weight: 800;
+            padding: 14px 40px;
+            border-radius: 50px;
+            box-shadow: 0 0 20px rgba(46, 204, 113, 0.6);
+            cursor: pointer;
+            transition: all 0.15s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        #paint-btn:active {
+            transform: scale(0.92);
+        }
+
+        /* Virtual Joystick */
+        #joystick-zone {
+            bottom: 25px;
+            left: 25px;
+            width: 110px;
+            height: 110px;
+            background: rgba(255, 255, 255, 0.15);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            position: absolute;
+            touch-action: none;
+        }
+
+        #joystick-knob {
+            width: 45px;
+            height: 45px;
+            background: radial-gradient(circle, #e67e22, #d35400);
+            border: 2px solid #fff;
+            border-radius: 50%;
+            position: absolute;
+            top: 32px;
+            left: 32px;
+        }
+
+        /* Action Buttons Kanan */
+        #action-buttons {
+            bottom: 25px;
+            right: 25px;
+            display: flex;
+            gap: 12px;
+        }
+
+        .action-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border: 2px solid #fff;
+            background: rgba(41, 128, 185, 0.85);
+            color: white;
+            font-weight: bold;
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+            cursor: pointer;
+        }
+
+        .action-btn:active {
+            transform: scale(0.9);
+        }
+
+        /* Modal Base */
+        .modal {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.88);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s ease;
+        }
+
+        .modal.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-box {
+            background: #2c1a12;
+            border: 3px solid #e67e22;
+            border-radius: 20px;
+            width: 90%;
+            max-width: 520px;
+            max-height: 85vh;
+            overflow-y: auto;
+            padding: 22px;
+            text-align: center;
+            box-shadow: 0 0 30px rgba(230, 126, 34, 0.5);
+        }
+
+        .modal-title {
+            color: #f39c12;
+            font-size: 20px;
+            margin-bottom: 12px;
+            font-weight: bold;
+        }
+
+        .modal-text {
+            font-size: 14px;
+            line-height: 1.5;
+            margin-bottom: 18px;
+            color: #ecf0f1;
+            text-align: left;
+        }
+
+        .guide-section {
+            background: rgba(0,0,0,0.3);
+            border-left: 4px solid #e67e22;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .guide-section h4 {
+            color: #f1c40f;
+            margin-bottom: 4px;
+            font-size: 14px;
+        }
+
+        .quiz-btn {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0;
+            background: #34495e;
+            border: 1px solid #7f8c8d;
+            border-radius: 10px;
+            color: white;
+            font-size: 13px;
+            cursor: pointer;
+            text-align: left;
+            transition: background 0.2s;
+        }
+
+        .quiz-btn:hover {
+            background: #2980b9;
+        }
+
+        /* Timer Misi Kilat */
+        #timer-bar {
+            width: 100%;
+            height: 8px;
+            background: #555;
+            border-radius: 4px;
+            margin-bottom: 12px;
+            overflow: hidden;
+        }
+
+        #timer-fill {
+            width: 100%;
+            height: 100%;
+            background: #e74c3c;
+            transition: width 0.1s linear;
+        }
+
+        .close-btn {
+            background: #c0392b;
+            color: white;
+            border: none;
+            padding: 10px 25px;
+            border-radius: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        /* Toast Notifications */
+        #toast {
+            position: absolute;
+            top: 75px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(46, 204, 113, 0.95);
+            color: white;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 13px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 50;
+            pointer-events: none;
+        }
+    </style>
+
+    <!-- Three.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+    <div id="game-container">
+        <!-- Canvas 3D -->
+        <canvas id="canvas3d"></canvas>
+
+        <!-- HUD Atas -->
+        <div id="top-hud" class="ui-panel">
+            <div class="hud-card" id="role-display">🥷 Penyamar</div>
+            <div class="hud-card" id="score-display">Skor: 0</div>
+            <button class="hud-btn interactive" onclick="openGuide()">📖 Panduan GenRe</button>
+        </div>
+
+        <!-- Notification Toast -->
+        <div id="toast">Kamuflase Berhasil!</div>
+
+        <!-- Tombol Paint -->
+        <div id="paint-btn-container" class="ui-panel interactive">
+            <button id="paint-btn" onclick="triggerPaint()">🎨 PAINT</button>
+        </div>
+
+        <!-- Virtual Joystick -->
+        <div id="joystick-zone" class="ui-panel interactive">
+            <div id="joystick-knob"></div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div id="action-buttons" class="ui-panel interactive">
+            <div class="action-btn" onclick="triggerScan()">🔍 Scan</div>
+            <div class="action-btn" onclick="startRandomQuiz()">⚡ Misi</div>
+        </div>
+
+        <!-- Modal Panduan GenRe -->
+        <div id="guide-modal" class="modal">
+            <div class="modal-box">
+                <div class="modal-title">📖 Panduan Ringkas GenRe</div>
+                <div class="modal-text">
+                    <div class="guide-section">
+                        <h4>1. Apa itu GenRe?</h4>
+                        <p><strong>Generasi Berencana:</strong> Program BKKBN untuk menyiapkan remaja merencanakan masa depan (pendidikan, karir, hingga pernikahan yang matang).</p>
+                    </div>
+                    <div class="guide-section">
+                        <h4>2. Triad KKR (3 Hal Wajib Dihindari)</h4>
+                        <p>🚫 Pernikahan Dini<br>🚫 Seks Bebas / Pra-Nikah<br>🚫 NAPZA & HIV/AIDS</p>
+                    </div>
+                    <div class="guide-section">
+                        <h4>3. PUP (Usia Ideal Menikah)</h4>
+                        <p>👩 <strong>Perempuan:</strong> Minimal 21 Tahun<br>👨 <strong>Laki-laki:</strong> Minimal 25 Tahun</p>
+                    </div>
+                    <div class="guide-section">
+                        <h4>4. 8 Fungsi Keluarga</h4>
+                        <p>Agama, Cinta Kasih, Perlindungan, Sosial Budaya, Reproduksi, Sosialisasi/Pendidikan, Ekonomi, & Pembinaan Lingkungan.</p>
+                    </div>
+                    <div class="guide-section">
+                        <h4>5. Pencegahan Stunting</h4>
+                        <p>Kondisi gagal tumbuh pada anak. Remaja putri harus sehat dan bebas Anemia agar melahirkan generasi bebas stunting.</p>
+                    </div>
+                </div>
+                <button class="close-btn" onclick="closeGuide()">Tutup</button>
+            </div>
+        </div>
+
+        <!-- Modal Quiz / Misi Kilat -->
+        <div id="quiz-modal" class="modal">
+            <div class="modal-box">
+                <div id="timer-bar"><div id="timer-fill"></div></div>
+                <div class="modal-title" id="quiz-title">Tantangan GenRe!</div>
+                <div class="modal-text" id="quiz-question">Pertanyaan kuis akan muncul di sini...</div>
+                <div id="quiz-options"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Web Audio Synthesizer ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            if (type === 'paint') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.2);
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.2);
+            } else if (type === 'correct') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(523.25, audioCtx.currentTime);
+                osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.3);
+            } else if (type === 'wrong') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(180, audioCtx.currentTime);
+                osc.frequency.setValueAtTime(110, audioCtx.currentTime + 0.15);
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.3);
+            }
+        }
+
+        // --- THREE.JS SCENE SETUP ---
+        const canvas = document.getElementById('canvas3d');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x2c1a12);
+        scene.fog = new THREE.FogExp2(0x2c1a12, 0.05);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffe2b3, 0.85);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffb057, 1.2);
+        dirLight.position.set(10, 20, 10);
+        dirLight.castShadow = true;
+        scene.add(dirLight);
+
+        // --- DEKORASI RUMAH/KEDAI KAYU 3D ---
+        const floorGeo = new THREE.PlaneGeometry(30, 30);
+        const floorMat = new THREE.MeshStandardMaterial({ color: 0x5c3a21, roughness: 0.8 });
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        floor.receiveShadow = true;
+        scene.add(floor);
+
+        // Karpet Merah
+        const carpetGeo = new THREE.PlaneGeometry(8, 12);
+        const carpetMat = new THREE.MeshStandardMaterial({ color: 0x961c1c });
+        const carpet = new THREE.Mesh(carpetGeo, carpetMat);
+        carpet.rotation.x = -Math.PI / 2;
+        carpet.position.set(0, 0.01, 0);
+        carpet.userData = { colorHex: 0x961c1c, name: "Karpet Merah" };
+        scene.add(carpet);
+
+        // Objek Berkelompok
+        const interactableObjects = [];
+
+        function createPot(x, z, colorHex, name) {
+            const group = new THREE.Group();
+            const geo = new THREE.CylinderGeometry(0.6, 0.4, 1.5, 12);
+            const mat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.5 });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.y = 0.75;
+            mesh.castShadow = true;
+            group.add(mesh);
+            group.position.set(x, 0, z);
+            group.userData = { colorHex: colorHex, name: name };
+            scene.add(group);
+            interactableObjects.push(group);
+        }
+
+        function createChest(x, z, colorHex, name) {
+            const geo = new THREE.BoxGeometry(1.5, 1, 1);
+            const mat = new THREE.MeshStandardMaterial({ color: colorHex });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.set(x, 0.5, z);
+            mesh.castShadow = true;
+            mesh.userData = { colorHex: colorHex, name: name };
+            scene.add(mesh);
+            interactableObjects.push(mesh);
+        }
+
+        createPot(-4, -3, 0xd35400, "Pot Tanah Liat Oranye");
+        createPot(4, 2, 0x27ae60, "Pot Hijau Hijau");
+        createChest(-3, 4, 0x8e44ad, "Peti Ungu");
+        createChest(5, -4, 0xf39c12, "Peti Kayu Emas");
+
+        // Dinding Kayu
+        const wallMat = new THREE.MeshStandardMaterial({ color: 0x3d2314 });
+        const wallBack = new THREE.Mesh(new THREE.BoxGeometry(30, 8, 1), wallMat);
+        wallBack.position.set(0, 4, -15);
+        wallBack.userData = { colorHex: 0x3d2314, name: "Dinding Kayu" };
+        scene.add(wallBack);
+        interactableObjects.push(wallBack);
+
+        // --- KARAKTER MANNEQUIN PUTIH ---
+        const playerGroup = new THREE.Group();
+        const playerMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 });
+        
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.35, 16, 16), playerMat);
+        head.position.y = 1.6;
+        playerGroup.add(head);
+
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.25, 0.9, 12), playerMat);
+        body.position.y = 0.95;
+        playerGroup.add(body);
+
+        playerGroup.position.set(0, 0, 5);
+        scene.add(playerGroup);
+
+        // --- KONTROL GERAKAN ---
+        let joystickActive = false;
+        let moveVector = { x: 0, z: 0 };
+        const joystickZone = document.getElementById('joystick-zone');
+        const joystickKnob = document.getElementById('joystick-knob');
+
+        joystickZone.addEventListener('pointerdown', (e) => {
+            joystickActive = true;
+            updateJoystick(e);
+        });
+
+        window.addEventListener('pointermove', (e) => {
+            if (joystickActive) updateJoystick(e);
+        });
+
+        window.addEventListener('pointerup', () => {
+            joystickActive = false;
+            moveVector = { x: 0, z: 0 };
+            joystickKnob.style.left = '32px';
+            joystickKnob.style.top = '32px';
+        });
+
+        function updateJoystick(e) {
+            const rect = joystickZone.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            
+            let dx = e.clientX - centerX;
+            let dy = e.clientY - centerY;
+            const dist = Math.hypot(dx, dy);
+            const maxDist = 35;
+
+            if (dist > maxDist) {
+                dx = (dx / dist) * maxDist;
+                dy = (dy / dist) * maxDist;
+            }
+
+            joystickKnob.style.left = `${32 + dx}px`;
+            joystickKnob.style.top = `${32 + dy}px`;
+
+            moveVector.x = dx / maxDist;
+            moveVector.z = dy / maxDist;
+        }
+
+        // --- MEKANISME PAINT ---
+        let score = 0;
+
+        function triggerPaint() {
+            playSound('paint');
+
+            let nearestObj = null;
+            let minDist = 3.5;
+
+            interactableObjects.forEach(obj => {
+                const dist = playerGroup.position.distanceTo(obj.position || obj.userData.position);
+                if (dist < minDist) {
+                    minDist = dist;
+                    nearestObj = obj;
+                }
+            });
+
+            if (nearestObj) {
+                const newColor = nearestObj.userData.colorHex;
+                playerMat.color.setHex(newColor);
+                showToast(`Kamuflase: Membaur dengan ${nearestObj.userData.name}!`);
+            } else {
+                playerMat.color.setHex(0xffffff);
+                showToast("Kembali ke Warna Putih Netral");
+            }
+        }
+
+        function triggerScan() {
+            showToast("Memindai Objek...");
+            setTimeout(() => {
+                showToast("Area Aman dari Pencari!");
+            }, 800);
+        }
+
+        function showToast(text) {
+            const toast = document.getElementById('toast');
+            toast.innerText = text;
+            toast.style.opacity = 1;
+            setTimeout(() => { toast.style.opacity = 0; }, 2200);
+        }
+
+        // --- MODAL PANDUAN ---
+        function openGuide() {
+            document.getElementById('guide-modal').classList.add('active');
+        }
+
+        function closeGuide() {
+            document.getElementById('guide-modal').classList.remove('active');
+        }
+
+        // --- BANK KUIS GENRE ---
+        const genreQuizzes = [
+            {
+                q: "Berapa usia minimal pernikahan ideal bagi perempuan menurut program PUP GenRe?",
+                opts: ["21 Tahun", "17 Tahun", "19 Tahun"],
+                ans: 0
+            },
+            {
+                q: "Berapa usia minimal pernikahan ideal bagi laki-laki menurut GenRe?",
+                opts: ["20 Tahun", "22 Tahun", "25 Tahun"],
+                ans: 2
+            },
+            {
+                q: "Mana di bawah ini yang TERMASUK dalam 3 ancaman utama Triad KKR?",
+                opts: ["Pernikahan Dini & NAPZA", "Putus Sekolah", "Kurang Olahraga"],
+                ans: 0
+            },
+            {
+                q: "Fungsi keluarga yang memberikan rasa aman dan perlindungan dinamakan fungsi...",
+                opts: ["Fungsi Agama", "Fungsi Perlindungan", "Fungsi Ekonomi"],
+                ans: 1
+            },
+            {
+                q: "Stunting pada anak dapat dicegah oleh remaja putri dengan cara menghindari...",
+                opts: ["Anemia (Kurang Darah)", "Olahraga Malam", "Membaca Buku"],
+                ans: 0
+            }
+        ];
+
+        let timerInterval = null;
+
+        function startRandomQuiz() {
+            const quiz = genreQuizzes[Math.floor(Math.random() * genreQuizzes.length)];
+            openQuiz("⚡ Misi Kilat GenRe", quiz.q, quiz.opts, quiz.ans);
+        }
+
+        function openQuiz(title, question, options, correctIdx) {
+            const modal = document.getElementById('quiz-modal');
+            document.getElementById('quiz-title').innerText = title;
+            document.getElementById('quiz-question').innerText = question;
+            
+            const optionsContainer = document.getElementById('quiz-options');
+            optionsContainer.innerHTML = '';
+
+            options.forEach((opt, idx) => {
+                const btn = document.createElement('button');
+                btn.className = 'quiz-btn';
+                btn.innerText = opt;
+                btn.onclick = () => {
+                    if (idx === correctIdx) {
+                        playSound('correct');
+                        score += 50;
+                        document.getElementById('score-display').innerText = `Skor: ${score}`;
+                        showToast("Jawaban Benar! +50 Poin");
+                    } else {
+                        playSound('wrong');
+                        showToast("Jawaban Salah!");
+                    }
+                    closeQuiz();
+                };
+                optionsContainer.appendChild(btn);
+            });
+
+            modal.classList.add('active');
+
+            let timeLeft = 100;
+            const timerFill = document.getElementById('timer-fill');
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                timeLeft -= 1;
+                timerFill.style.width = `${timeLeft}%`;
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    closeQuiz();
+                    showToast("Waktu Misi Habis!");
+                }
+            }, 100);
+        }
+
+        function closeQuiz() {
+            clearInterval(timerInterval);
+            document.getElementById('quiz-modal').classList.remove('active');
+        }
+
+        // --- ANIMATION LOOP ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const speed = 0.12;
+            playerGroup.position.x += moveVector.x * speed;
+            playerGroup.position.z += moveVector.z * speed;
+
+            playerGroup.position.x = Math.max(-13, Math.min(13, playerGroup.position.x));
+            playerGroup.position.z = Math.max(-13, Math.min(13, playerGroup.position.z));
+
+            camera.position.x = playerGroup.position.x;
+            camera.position.z = playerGroup.position.z + 8;
+            camera.position.y = 6;
+            camera.lookAt(playerGroup.position.x, 1, playerGroup.position.z);
+
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html><!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Paint & Hide: GenRe Chameleon 3D</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #1a0f0d;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #fff;
+        }
+
+        /* Mode Paksa Landscape di Layar HP */
+        @media screen and (min-aspect-ratio: 1/1) {
+            #game-container {
+                width: 100vw;
+                height: 100vh;
+            }
+        }
+
+        @media screen and (max-aspect-ratio: 1/1) {
+            #game-container {
+                width: 100vh;
+                height: 100vw;
+                transform: rotate(90deg);
+                transform-origin: bottom left;
+                position: absolute;
+                top: -100vw;
+                left: 0;
+            }
+        }
+
+        #game-container {
+            position: relative;
+            background: #000;
+        }
+
+        #canvas3d {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* UI Overlays */
+        .ui-panel {
+            position: absolute;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .interactive {
+            pointer-events: auto;
+        }
+
+        /* HUD Atas */
+        #top-hud {
+            top: 12px;
+            left: 15px;
+            right: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .hud-card {
+            background: rgba(30, 18, 12, 0.85);
+            border: 2px solid #d4a359;
+            border-radius: 12px;
+            padding: 6px 14px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            backdrop-filter: blur(5px);
+            font-weight: bold;
+            font-size: 13px;
+        }
+
+        .hud-btn {
+            background: linear-gradient(135deg, #e67e22, #d35400);
+            border: 2px solid #fff;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 12px;
+            cursor: pointer;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+        }
+
+        .hud-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* Tombol Utama Paint */
+        #paint-btn-container {
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+        }
+
+        #paint-btn {
+            background: linear-gradient(135deg, #2ecc71, #27ae60);
+            border: 3px solid #ffffff;
+            color: white;
+            font-size: 18px;
+            font-weight: 800;
+            padding: 14px 40px;
+            border-radius: 50px;
+            box-shadow: 0 0 20px rgba(46, 204, 113, 0.6);
+            cursor: pointer;
+            transition: all 0.15s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        #paint-btn:active {
+            transform: scale(0.92);
+        }
+
+        /* Virtual Joystick */
+        #joystick-zone {
+            bottom: 25px;
+            left: 25px;
+            width: 110px;
+            height: 110px;
+            background: rgba(255, 255, 255, 0.15);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            position: absolute;
+            touch-action: none;
+        }
+
+        #joystick-knob {
+            width: 45px;
+            height: 45px;
+            background: radial-gradient(circle, #e67e22, #d35400);
+            border: 2px solid #fff;
+            border-radius: 50%;
+            position: absolute;
+            top: 32px;
+            left: 32px;
+        }
+
+        /* Action Buttons Kanan */
+        #action-buttons {
+            bottom: 25px;
+            right: 25px;
+            display: flex;
+            gap: 12px;
+        }
+
+        .action-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border: 2px solid #fff;
+            background: rgba(41, 128, 185, 0.85);
+            color: white;
+            font-weight: bold;
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+            cursor: pointer;
+        }
+
+        .action-btn:active {
+            transform: scale(0.9);
+        }
+
+        /* Modal Base */
+        .modal {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.88);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s ease;
+        }
+
+        .modal.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-box {
+            background: #2c1a12;
+            border: 3px solid #e67e22;
+            border-radius: 20px;
+            width: 90%;
+            max-width: 520px;
+            max-height: 85vh;
+            overflow-y: auto;
+            padding: 22px;
+            text-align: center;
+            box-shadow: 0 0 30px rgba(230, 126, 34, 0.5);
+        }
+
+        .modal-title {
+            color: #f39c12;
+            font-size: 20px;
+            margin-bottom: 12px;
+            font-weight: bold;
+        }
+
+        .modal-text {
+            font-size: 14px;
+            line-height: 1.5;
+            margin-bottom: 18px;
+            color: #ecf0f1;
+            text-align: left;
+        }
+
+        .guide-section {
+            background: rgba(0,0,0,0.3);
+            border-left: 4px solid #e67e22;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .guide-section h4 {
+            color: #f1c40f;
+            margin-bottom: 4px;
+            font-size: 14px;
+        }
+
+        .quiz-btn {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0;
+            background: #34495e;
+            border: 1px solid #7f8c8d;
+            border-radius: 10px;
+            color: white;
+            font-size: 13px;
+            cursor: pointer;
+            text-align: left;
+            transition: background 0.2s;
+        }
+
+        .quiz-btn:hover {
+            background: #2980b9;
+        }
+
+        /* Timer Misi Kilat */
+        #timer-bar {
+            width: 100%;
+            height: 8px;
+            background: #555;
+            border-radius: 4px;
+            margin-bottom: 12px;
+            overflow: hidden;
+        }
+
+        #timer-fill {
+            width: 100%;
+            height: 100%;
+            background: #e74c3c;
+            transition: width 0.1s linear;
+        }
+
+        .close-btn {
+            background: #c0392b;
+            color: white;
+            border: none;
+            padding: 10px 25px;
+            border-radius: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        /* Toast Notifications */
+        #toast {
+            position: absolute;
+            top: 75px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(46, 204, 113, 0.95);
+            color: white;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 13px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 50;
+            pointer-events: none;
+        }
+    </style>
+
+    <!-- Three.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+    <div id="game-container">
+        <!-- Canvas 3D -->
+        <canvas id="canvas3d"></canvas>
+
+        <!-- HUD Atas -->
+        <div id="top-hud" class="ui-panel">
+            <div class="hud-card" id="role-display">🥷 Penyamar</div>
+            <div class="hud-card" id="score-display">Skor: 0</div>
+            <button class="hud-btn interactive" onclick="openGuide()">📖 Panduan GenRe</button>
+        </div>
+
+        <!-- Notification Toast -->
+        <div id="toast">Kamuflase Berhasil!</div>
+
+        <!-- Tombol Paint -->
+        <div id="paint-btn-container" class="ui-panel interactive">
+            <button id="paint-btn" onclick="triggerPaint()">🎨 PAINT</button>
+        </div>
+
+        <!-- Virtual Joystick -->
+        <div id="joystick-zone" class="ui-panel interactive">
+            <div id="joystick-knob"></div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div id="action-buttons" class="ui-panel interactive">
+            <div class="action-btn" onclick="triggerScan()">🔍 Scan</div>
+            <div class="action-btn" onclick="startRandomQuiz()">⚡ Misi</div>
+        </div>
+
+        <!-- Modal Panduan GenRe -->
+        <div id="guide-modal" class="modal">
+            <div class="modal-box">
+                <div class="modal-title">📖 Panduan Ringkas GenRe</div>
+                <div class="modal-text">
+                    <div class="guide-section">
+                        <h4>1. Apa itu GenRe?</h4>
+                        <p><strong>Generasi Berencana:</strong> Program BKKBN untuk menyiapkan remaja merencanakan masa depan (pendidikan, karir, hingga pernikahan yang matang).</p>
+                    </div>
+                    <div class="guide-section">
+                        <h4>2. Triad KKR (3 Hal Wajib Dihindari)</h4>
+                        <p>🚫 Pernikahan Dini<br>🚫 Seks Bebas / Pra-Nikah<br>🚫 NAPZA & HIV/AIDS</p>
+                    </div>
+                    <div class="guide-section">
+                        <h4>3. PUP (Usia Ideal Menikah)</h4>
+                        <p>👩 <strong>Perempuan:</strong> Minimal 21 Tahun<br>👨 <strong>Laki-laki:</strong> Minimal 25 Tahun</p>
+                    </div>
+                    <div class="guide-section">
+                        <h4>4. 8 Fungsi Keluarga</h4>
+                        <p>Agama, Cinta Kasih, Perlindungan, Sosial Budaya, Reproduksi, Sosialisasi/Pendidikan, Ekonomi, & Pembinaan Lingkungan.</p>
+                    </div>
+                    <div class="guide-section">
+                        <h4>5. Pencegahan Stunting</h4>
+                        <p>Kondisi gagal tumbuh pada anak. Remaja putri harus sehat dan bebas Anemia agar melahirkan generasi bebas stunting.</p>
+                    </div>
+                </div>
+                <button class="close-btn" onclick="closeGuide()">Tutup</button>
+            </div>
+        </div>
+
+        <!-- Modal Quiz / Misi Kilat -->
+        <div id="quiz-modal" class="modal">
+            <div class="modal-box">
+                <div id="timer-bar"><div id="timer-fill"></div></div>
+                <div class="modal-title" id="quiz-title">Tantangan GenRe!</div>
+                <div class="modal-text" id="quiz-question">Pertanyaan kuis akan muncul di sini...</div>
+                <div id="quiz-options"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Web Audio Synthesizer ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            if (type === 'paint') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.2);
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.2);
+            } else if (type === 'correct') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(523.25, audioCtx.currentTime);
+                osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.3);
+            } else if (type === 'wrong') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(180, audioCtx.currentTime);
+                osc.frequency.setValueAtTime(110, audioCtx.currentTime + 0.15);
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.3);
+            }
+        }
+
+        // --- THREE.JS SCENE SETUP ---
+        const canvas = document.getElementById('canvas3d');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x2c1a12);
+        scene.fog = new THREE.FogExp2(0x2c1a12, 0.05);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffe2b3, 0.85);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffb057, 1.2);
+        dirLight.position.set(10, 20, 10);
+        dirLight.castShadow = true;
+        scene.add(dirLight);
+
+        // --- DEKORASI RUMAH/KEDAI KAYU 3D ---
+        const floorGeo = new THREE.PlaneGeometry(30, 30);
+        const floorMat = new THREE.MeshStandardMaterial({ color: 0x5c3a21, roughness: 0.8 });
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        floor.receiveShadow = true;
+        scene.add(floor);
+
+        // Karpet Merah
+        const carpetGeo = new THREE.PlaneGeometry(8, 12);
+        const carpetMat = new THREE.MeshStandardMaterial({ color: 0x961c1c });
+        const carpet = new THREE.Mesh(carpetGeo, carpetMat);
+        carpet.rotation.x = -Math.PI / 2;
+        carpet.position.set(0, 0.01, 0);
+        carpet.userData = { colorHex: 0x961c1c, name: "Karpet Merah" };
+        scene.add(carpet);
+
+        // Objek Berkelompok
+        const interactableObjects = [];
+
+        function createPot(x, z, colorHex, name) {
+            const group = new THREE.Group();
+            const geo = new THREE.CylinderGeometry(0.6, 0.4, 1.5, 12);
+            const mat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.5 });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.y = 0.75;
+            mesh.castShadow = true;
+            group.add(mesh);
+            group.position.set(x, 0, z);
+            group.userData = { colorHex: colorHex, name: name };
+            scene.add(group);
+            interactableObjects.push(group);
+        }
+
+        function createChest(x, z, colorHex, name) {
+            const geo = new THREE.BoxGeometry(1.5, 1, 1);
+            const mat = new THREE.MeshStandardMaterial({ color: colorHex });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.set(x, 0.5, z);
+            mesh.castShadow = true;
+            mesh.userData = { colorHex: colorHex, name: name };
+            scene.add(mesh);
+            interactableObjects.push(mesh);
+        }
+
+        createPot(-4, -3, 0xd35400, "Pot Tanah Liat Oranye");
+        createPot(4, 2, 0x27ae60, "Pot Hijau Hijau");
+        createChest(-3, 4, 0x8e44ad, "Peti Ungu");
+        createChest(5, -4, 0xf39c12, "Peti Kayu Emas");
+
+        // Dinding Kayu
+        const wallMat = new THREE.MeshStandardMaterial({ color: 0x3d2314 });
+        const wallBack = new THREE.Mesh(new THREE.BoxGeometry(30, 8, 1), wallMat);
+        wallBack.position.set(0, 4, -15);
+        wallBack.userData = { colorHex: 0x3d2314, name: "Dinding Kayu" };
+        scene.add(wallBack);
+        interactableObjects.push(wallBack);
+
+        // --- KARAKTER MANNEQUIN PUTIH ---
+        const playerGroup = new THREE.Group();
+        const playerMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 });
+        
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.35, 16, 16), playerMat);
+        head.position.y = 1.6;
+        playerGroup.add(head);
+
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.25, 0.9, 12), playerMat);
+        body.position.y = 0.95;
+        playerGroup.add(body);
+
+        playerGroup.position.set(0, 0, 5);
+        scene.add(playerGroup);
+
+        // --- KONTROL GERAKAN ---
+        let joystickActive = false;
+        let moveVector = { x: 0, z: 0 };
+        const joystickZone = document.getElementById('joystick-zone');
+        const joystickKnob = document.getElementById('joystick-knob');
+
+        joystickZone.addEventListener('pointerdown', (e) => {
+            joystickActive = true;
+            updateJoystick(e);
+        });
+
+        window.addEventListener('pointermove', (e) => {
+            if (joystickActive) updateJoystick(e);
+        });
+
+        window.addEventListener('pointerup', () => {
+            joystickActive = false;
+            moveVector = { x: 0, z: 0 };
+            joystickKnob.style.left = '32px';
+            joystickKnob.style.top = '32px';
+        });
+
+        function updateJoystick(e) {
+            const rect = joystickZone.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            
+            let dx = e.clientX - centerX;
+            let dy = e.clientY - centerY;
+            const dist = Math.hypot(dx, dy);
+            const maxDist = 35;
+
+            if (dist > maxDist) {
+                dx = (dx / dist) * maxDist;
+                dy = (dy / dist) * maxDist;
+            }
+
+            joystickKnob.style.left = `${32 + dx}px`;
+            joystickKnob.style.top = `${32 + dy}px`;
+
+            moveVector.x = dx / maxDist;
+            moveVector.z = dy / maxDist;
+        }
+
+        // --- MEKANISME PAINT ---
+        let score = 0;
+
+        function triggerPaint() {
+            playSound('paint');
+
+            let nearestObj = null;
+            let minDist = 3.5;
+
+            interactableObjects.forEach(obj => {
+                const dist = playerGroup.position.distanceTo(obj.position || obj.userData.position);
+                if (dist < minDist) {
+                    minDist = dist;
+                    nearestObj = obj;
+                }
+            });
+
+            if (nearestObj) {
+                const newColor = nearestObj.userData.colorHex;
+                playerMat.color.setHex(newColor);
+                showToast(`Kamuflase: Membaur dengan ${nearestObj.userData.name}!`);
+            } else {
+                playerMat.color.setHex(0xffffff);
+                showToast("Kembali ke Warna Putih Netral");
+            }
+        }
+
+        function triggerScan() {
+            showToast("Memindai Objek...");
+            setTimeout(() => {
+                showToast("Area Aman dari Pencari!");
+            }, 800);
+        }
+
+        function showToast(text) {
+            const toast = document.getElementById('toast');
+            toast.innerText = text;
+            toast.style.opacity = 1;
+            setTimeout(() => { toast.style.opacity = 0; }, 2200);
+        }
+
+        // --- MODAL PANDUAN ---
+        function openGuide() {
+            document.getElementById('guide-modal').classList.add('active');
+        }
+
+        function closeGuide() {
+            document.getElementById('guide-modal').classList.remove('active');
+        }
+
+        // --- BANK KUIS GENRE ---
+        const genreQuizzes = [
+            {
+                q: "Berapa usia minimal pernikahan ideal bagi perempuan menurut program PUP GenRe?",
+                opts: ["21 Tahun", "17 Tahun", "19 Tahun"],
+                ans: 0
+            },
+            {
+                q: "Berapa usia minimal pernikahan ideal bagi laki-laki menurut GenRe?",
+                opts: ["20 Tahun", "22 Tahun", "25 Tahun"],
+                ans: 2
+            },
+            {
+                q: "Mana di bawah ini yang TERMASUK dalam 3 ancaman utama Triad KKR?",
+                opts: ["Pernikahan Dini & NAPZA", "Putus Sekolah", "Kurang Olahraga"],
+                ans: 0
+            },
+            {
+                q: "Fungsi keluarga yang memberikan rasa aman dan perlindungan dinamakan fungsi...",
+                opts: ["Fungsi Agama", "Fungsi Perlindungan", "Fungsi Ekonomi"],
+                ans: 1
+            },
+            {
+                q: "Stunting pada anak dapat dicegah oleh remaja putri dengan cara menghindari...",
+                opts: ["Anemia (Kurang Darah)", "Olahraga Malam", "Membaca Buku"],
+                ans: 0
+            }
+        ];
+
+        let timerInterval = null;
+
+        function startRandomQuiz() {
+            const quiz = genreQuizzes[Math.floor(Math.random() * genreQuizzes.length)];
+            openQuiz("⚡ Misi Kilat GenRe", quiz.q, quiz.opts, quiz.ans);
+        }
+
+        function openQuiz(title, question, options, correctIdx) {
+            const modal = document.getElementById('quiz-modal');
+            document.getElementById('quiz-title').innerText = title;
+            document.getElementById('quiz-question').innerText = question;
+            
+            const optionsContainer = document.getElementById('quiz-options');
+            optionsContainer.innerHTML = '';
+
+            options.forEach((opt, idx) => {
+                const btn = document.createElement('button');
+                btn.className = 'quiz-btn';
+                btn.innerText = opt;
+                btn.onclick = () => {
+                    if (idx === correctIdx) {
+                        playSound('correct');
+                        score += 50;
+                        document.getElementById('score-display').innerText = `Skor: ${score}`;
+                        showToast("Jawaban Benar! +50 Poin");
+                    } else {
+                        playSound('wrong');
+                        showToast("Jawaban Salah!");
+                    }
+                    closeQuiz();
+                };
+                optionsContainer.appendChild(btn);
+            });
+
+            modal.classList.add('active');
+
+            let timeLeft = 100;
+            const timerFill = document.getElementById('timer-fill');
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                timeLeft -= 1;
+                timerFill.style.width = `${timeLeft}%`;
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    closeQuiz();
+                    showToast("Waktu Misi Habis!");
+                }
+            }, 100);
+        }
+
+        function closeQuiz() {
+            clearInterval(timerInterval);
+            document.getElementById('quiz-modal').classList.remove('active');
+        }
+
+        // --- ANIMATION LOOP ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const speed = 0.12;
+            playerGroup.position.x += moveVector.x * speed;
+            playerGroup.position.z += moveVector.z * speed;
+
+            playerGroup.position.x = Math.max(-13, Math.min(13, playerGroup.position.x));
+            playerGroup.position.z = Math.max(-13, Math.min(13, playerGroup.position.z));
+
+            camera.position.x = playerGroup.position.x;
+            camera.position.z = playerGroup.position.z + 8;
+            camera.position.y = 6;
+            camera.lookAt(playerGroup.position.x, 1, playerGroup.position.z);
+
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+  </html>
